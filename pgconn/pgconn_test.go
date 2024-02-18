@@ -732,7 +732,10 @@ func TestConnDeallocateSucceedsInAbortedTransaction(t *testing.T) {
 	err = pgConn.Deallocate(ctx, "ps1")
 	require.NoError(t, err)
 
-	err = pgConn.Exec(ctx, "rollback").Close()
+	r := pgConn.Exec(ctx, "rollback")
+	assert.True(t, r.NextResult())
+	assert.Equal(t, r.ResultReader().Read().CommandTag.String(), "ROLLBACK")
+	err = r.Close()
 	require.NoError(t, err)
 
 	_, err = pgConn.ExecPrepared(ctx, "ps1", nil, nil, nil).Close()
