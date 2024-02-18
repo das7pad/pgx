@@ -1843,6 +1843,168 @@ func (pgConn *PgConn) Ping(ctx context.Context) error {
 
 // makeCommandTag makes a CommandTag. It does not retain a reference to buf or buf's underlying memory.
 func (pgConn *PgConn) makeCommandTag(buf []byte) CommandTag {
+	// Avoid allocation for common cases.
+	if len(buf) == 0 {
+		return CommandTag{s: ""}
+	}
+	switch buf[0] {
+	case 'B':
+		switch string(buf) {
+		case "BEGIN":
+			return CommandTag{s: "BEGIN"}
+		}
+	case 'C':
+		switch string(buf) {
+		case "COMMIT":
+			return CommandTag{s: "COMMIT"}
+		case "COPY 0":
+			return CommandTag{s: "COPY 0"}
+		case "COPY 1":
+			return CommandTag{s: "COPY 1"}
+		case "COPY 2":
+			return CommandTag{s: "COPY 2"}
+		case "COPY 3":
+			return CommandTag{s: "COPY 3"}
+		case "COPY 4":
+			return CommandTag{s: "COPY 4"}
+		}
+	case 'D':
+		switch string(buf) {
+		case "DELETE 0":
+			return CommandTag{s: "DELETE 0"}
+		case "DELETE 1":
+			return CommandTag{s: "DELETE 1"}
+		case "DELETE 2":
+			return CommandTag{s: "DELETE 2"}
+		case "DELETE 3":
+			return CommandTag{s: "DELETE 3"}
+		case "DELETE 4":
+			return CommandTag{s: "DELETE 4"}
+		case "DEALLOCATE":
+			return CommandTag{s: "DEALLOCATE"}
+		}
+	case 'F':
+		switch string(buf) {
+		case "FETCH 0":
+			return CommandTag{s: "FETCH 0"}
+		case "FETCH 1":
+			return CommandTag{s: "FETCH 1"}
+		case "FETCH 2":
+			return CommandTag{s: "FETCH 2"}
+		case "FETCH 3":
+			return CommandTag{s: "FETCH 3"}
+		case "FETCH 4":
+			return CommandTag{s: "FETCH 4"}
+		}
+	case 'I':
+		// The first number, oid, is always zero per the docs.
+		switch string(buf) {
+		case "INSERT 0 0":
+			return CommandTag{s: "INSERT 0 0"}
+		case "INSERT 0 1":
+			return CommandTag{s: "INSERT 0 1"}
+		case "INSERT 0 2":
+			return CommandTag{s: "INSERT 0 2"}
+		case "INSERT 0 3":
+			return CommandTag{s: "INSERT 0 3"}
+		case "INSERT 0 4":
+			return CommandTag{s: "INSERT 0 4"}
+		}
+	case 'L':
+		switch string(buf) {
+		case "LISTEN":
+			return CommandTag{s: "LISTEN"}
+		}
+	case 'M':
+		switch string(buf) {
+		case "MERGE 0":
+			return CommandTag{s: "MERGE 0"}
+		case "MERGE 1":
+			return CommandTag{s: "MERGE 1"}
+		case "MERGE 2":
+			return CommandTag{s: "MERGE 2"}
+		case "MERGE 3":
+			return CommandTag{s: "MERGE 3"}
+		case "MERGE 4":
+			return CommandTag{s: "MERGE 4"}
+		case "MOVE 0":
+			return CommandTag{s: "MOVE 0"}
+		case "MOVE 1":
+			return CommandTag{s: "MOVE 1"}
+		case "MOVE 2":
+			return CommandTag{s: "MOVE 2"}
+		case "MOVE 3":
+			return CommandTag{s: "MOVE 3"}
+		case "MOVE 4":
+			return CommandTag{s: "MOVE 4"}
+		}
+	case 'N':
+		switch string(buf) {
+		case "NOTIFY":
+			return CommandTag{s: "NOTIFY"}
+		}
+	case 'R':
+		switch string(buf) {
+		case "ROLLBACK":
+			return CommandTag{s: "ROLLBACK"}
+		case "RELEASE":
+			return CommandTag{s: "RELEASE"}
+		}
+	case 'S':
+		switch string(buf) {
+		case "SELECT 0":
+			return CommandTag{s: "SELECT 0"}
+		case "SELECT 1":
+			return CommandTag{s: "SELECT 1"}
+		case "SELECT 2":
+			return CommandTag{s: "SELECT 2"}
+		case "SELECT 3":
+			return CommandTag{s: "SELECT 3"}
+		case "SELECT 4":
+			return CommandTag{s: "SELECT 4"}
+		// common pagination
+		case "SELECT 5":
+			return CommandTag{s: "SELECT 5"}
+		case "SELECT 10":
+			return CommandTag{s: "SELECT 10"}
+		case "SELECT 20":
+			return CommandTag{s: "SELECT 20"}
+		case "SELECT 25":
+			return CommandTag{s: "SELECT 25"}
+		case "SELECT 50":
+			return CommandTag{s: "SELECT 50"}
+		case "SELECT 100":
+			return CommandTag{s: "SELECT 100"}
+		case "SELECT 200":
+			return CommandTag{s: "SELECT 200"}
+		case "SELECT 250":
+			return CommandTag{s: "SELECT 250"}
+		case "SELECT 500":
+			return CommandTag{s: "SELECT 500"}
+		case "SELECT 1000":
+			return CommandTag{s: "SELECT 1000"}
+		case "SAVEPOINT":
+			return CommandTag{s: "SAVEPOINT"}
+		case "SET":
+			return CommandTag{s: "SET"}
+		case "SHOW":
+			return CommandTag{s: "SHOW"}
+		}
+	case 'U':
+		switch string(buf) {
+		case "UPDATE 0":
+			return CommandTag{s: "UPDATE 0"}
+		case "UPDATE 1":
+			return CommandTag{s: "UPDATE 1"}
+		case "UPDATE 2":
+			return CommandTag{s: "UPDATE 2"}
+		case "UPDATE 3":
+			return CommandTag{s: "UPDATE 3"}
+		case "UPDATE 4":
+			return CommandTag{s: "UPDATE 4"}
+		}
+	}
+	// Fallback to allocation.
 	return CommandTag{s: string(buf)}
 }
 
