@@ -822,7 +822,10 @@ func (pgConn *PgConn) convertRowDescription(dst []FieldDescription, rd *pgproto3
 	}
 
 	for i := range rd.Fields {
-		dst[i].Name = string(rd.Fields[i].Name)
+		if dst[i].Name != string(rd.Fields[i].Name) {
+			// Avoid allocation if already cached. The above does not allocate.
+			dst[i].Name = string(rd.Fields[i].Name)
+		}
 		dst[i].TableOID = rd.Fields[i].TableOID
 		dst[i].TableAttributeNumber = rd.Fields[i].TableAttributeNumber
 		dst[i].DataTypeOID = rd.Fields[i].DataTypeOID
