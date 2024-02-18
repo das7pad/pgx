@@ -116,7 +116,7 @@ func (r *connRow) Scan(dest ...any) (err error) {
 		return rows.Err()
 	}
 
-	rows.Scan(dest...)
+	rows.scan(true, dest...)
 	rows.Close()
 	return rows.Err()
 }
@@ -225,6 +225,10 @@ func (rows *baseRows) Next() bool {
 }
 
 func (rows *baseRows) Scan(dest ...any) error {
+	return rows.scan(false, dest...)
+}
+
+func (rows *baseRows) scan(once bool, dest ...any) error {
 	m := rows.typeMap
 	fieldDescriptions := rows.FieldDescriptions()
 	values := rows.values
@@ -251,13 +255,9 @@ func (rows *baseRows) Scan(dest ...any) error {
 		return err
 	}
 
-	if rows.scanPlans == nil {
+	if !once && rows.scanPlans == nil {
 		rows.scanPlans = make([]pgtype.ScanPlan, len(values))
 		rows.scanTypes = make([]reflect.Type, len(values))
-		for i := range dest {
-			rows.scanPlans[i] = m.PlanScan(fieldDescriptions[i].DataTypeOID, fieldDescriptions[i].Format, dest[i])
-			rows.scanTypes[i] = reflect.TypeOf(dest[i])
-		}
 	}
 
 	for i, dst := range dest {
@@ -265,12 +265,24 @@ func (rows *baseRows) Scan(dest ...any) error {
 			continue
 		}
 
-		if rows.scanTypes[i] != reflect.TypeOf(dst) {
-			rows.scanPlans[i] = m.PlanScan(fieldDescriptions[i].DataTypeOID, fieldDescriptions[i].Format, dest[i])
-			rows.scanTypes[i] = reflect.TypeOf(dest[i])
+		var plan pgtype.ScanPlan
+		newPlan := once
+		if !once {
+			if t := reflect.TypeOf(dst); t != rows.scanTypes[i] {
+				newPlan = true
+				rows.scanTypes[i] = t
+			}
+		}
+		if newPlan {
+			plan = m.PlanScan(fieldDescriptions[i].DataTypeOID, fieldDescriptions[i].Format, dest[i])
+			if !once {
+				rows.scanPlans[i] = plan
+			}
+		} else {
+			plan = rows.scanPlans[i]
 		}
 
-		err := rows.scanPlans[i].Scan(values[i], dst)
+		err := plan.Scan(values[i], dst)
 		if err != nil {
 			err = ScanArgError{ColumnIndex: i, Err: err}
 			rows.fatal(err)
