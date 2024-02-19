@@ -550,9 +550,9 @@ func (pgConn *PgConn) ReceiveMessage(ctx context.Context) (pgproto3.BackendMessa
 	}
 	defer pgConn.unlock()
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return nil, newContextAlreadyDoneError(ctx)
 		default:
 		}
@@ -694,7 +694,7 @@ func (pgConn *PgConn) Close(ctx context.Context) error {
 	defer close(pgConn.cleanupDone)
 	defer pgConn.conn.Close()
 
-	if ctx != context.Background() {
+	if ctx.Done() != nil {
 		// Close may be called while a cancellable query is in progress. This will most often be triggered by panic when
 		// a defer closes the connection (possibly indirectly via a transaction or a connection pool). Unwatch to end any
 		// previous watch. It is safe to Unwatch regardless of whether a watch is already is progress.
@@ -906,9 +906,9 @@ func (pgConn *PgConn) Prepare(ctx context.Context, name, sql string, paramOIDs [
 	}
 	defer pgConn.unlock()
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return nil, newContextAlreadyDoneError(ctx)
 		default:
 		}
@@ -972,9 +972,9 @@ func (pgConn *PgConn) Deallocate(ctx context.Context, name string) error {
 	}
 	defer pgConn.unlock()
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return newContextAlreadyDoneError(ctx)
 		default:
 		}
@@ -1069,7 +1069,7 @@ func (pgConn *PgConn) CancelRequest(ctx context.Context) error {
 	}
 	defer cancelConn.Close()
 
-	if ctx != context.Background() {
+	if ctx.Done() != nil {
 		contextWatcher := ctxwatch.NewContextWatcher(&DeadlineContextWatcherHandler{Conn: cancelConn})
 		contextWatcher.Watch(ctx)
 		defer contextWatcher.Unwatch()
@@ -1100,9 +1100,9 @@ func (pgConn *PgConn) WaitForNotification(ctx context.Context) error {
 	}
 	defer pgConn.unlock()
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return newContextAlreadyDoneError(ctx)
 		default:
 		}
@@ -1142,9 +1142,9 @@ func (pgConn *PgConn) Exec(ctx context.Context, sql string) *MultiResultReader {
 		ctx:    ctx,
 	}
 	multiResult := &pgConn.multiResultReader
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			multiResult.closed = true
 			multiResult.err = newContextAlreadyDoneError(ctx)
 			pgConn.unlock()
@@ -1275,9 +1275,9 @@ func (pgConn *PgConn) execExtendedPrefix(ctx context.Context, paramValues [][]by
 		return result
 	}
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			result.concludeCommand(CommandTag{}, newContextAlreadyDoneError(ctx))
 			result.closed = true
 			pgConn.unlock()
@@ -1316,9 +1316,9 @@ func (pgConn *PgConn) CopyTo(ctx context.Context, w io.Writer, sql string) (Comm
 		return CommandTag{}, err
 	}
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			pgConn.unlock()
 			return CommandTag{}, newContextAlreadyDoneError(ctx)
 		default:
@@ -1376,9 +1376,9 @@ func (pgConn *PgConn) CopyFrom(ctx context.Context, r io.Reader, sql string) (Co
 	}
 	defer pgConn.unlock()
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			return CommandTag{}, newContextAlreadyDoneError(ctx)
 		default:
 		}
@@ -1950,9 +1950,9 @@ func (pgConn *PgConn) ExecBatch(ctx context.Context, batch *Batch) *MultiResultR
 	}
 	multiResult := &pgConn.multiResultReader
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			multiResult.closed = true
 			multiResult.err = newContextAlreadyDoneError(ctx)
 			pgConn.unlock()
@@ -2539,9 +2539,9 @@ func (pgConn *PgConn) StartPipeline(ctx context.Context) *Pipeline {
 
 	pipeline := &pgConn.pipeline
 
-	if ctx != context.Background() {
+	if done := ctx.Done(); done != nil {
 		select {
-		case <-ctx.Done():
+		case <-done:
 			pipeline.closed = true
 			pipeline.err = newContextAlreadyDoneError(ctx)
 			pgConn.unlock()
