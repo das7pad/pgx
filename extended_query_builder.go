@@ -35,47 +35,60 @@ func (eqb *ExtendedQueryBuilder) Build(m *pgtype.Map, sd *pgconn.StatementDescri
 	if len(sd.ParamOIDs) != len(args) {
 		return fmt.Errorf("mismatched param and argument count")
 	}
+	if sd.CachedPreferredArgFormats == nil {
+		sd.CachedPreferredArgFormats = make([]int16, len(sd.ParamOIDs))
+		for i := 0; i < len(sd.ParamOIDs); i++ {
+			sd.CachedPreferredArgFormats[i] = m.FormatCodeForOID(sd.ParamOIDs[i])
+		}
+	}
+	if sd.CachedResultFormats == nil {
+		sd.CachedResultFormats = make([]int16, len(sd.Fields))
+		for i := 0; i < len(sd.Fields); i++ {
+			sd.CachedResultFormats[i] = m.FormatCodeForOID(sd.Fields[i].DataTypeOID)
+		}
+	}
 
 	for i := range args {
-		err := eqb.appendParam(m, sd.ParamOIDs[i], -1, args[i])
+		err := eqb.appendParamWithFallback(m, sd.ParamOIDs[i], sd.CachedPreferredArgFormats[i], args[i])
 		if err != nil {
 			err = fmt.Errorf("failed to encode args[%d]: %w", i, err)
 			return err
 		}
 	}
 
-	for i := range sd.Fields {
-		eqb.appendResultFormat(m.FormatCodeForOID(sd.Fields[i].DataTypeOID))
-	}
+	eqb.ResultFormats = sd.CachedResultFormats
 
 	return nil
+}
+
+func (eqb *ExtendedQueryBuilder) appendParamWithFallback(m *pgtype.Map, oid uint32, preferredFormat int16, arg any) error {
+	switch arg.(type) {
+	case string, *string:
+		preferredFormat = TextFormatCode
+	}
+	preferredErr := eqb.appendParam(m, oid, preferredFormat, arg)
+	if preferredErr == nil {
+		return nil
+	}
+
+	var otherFormat int16
+	if preferredFormat == TextFormatCode {
+		otherFormat = BinaryFormatCode
+	} else {
+		otherFormat = TextFormatCode
+	}
+
+	otherErr := eqb.appendParam(m, oid, otherFormat, arg)
+	if otherErr == nil {
+		return nil
+	}
+
+	return preferredErr // return the error from the preferred format
 }
 
 // appendParam appends a parameter to the query. format may be -1 to automatically choose the format. If arg is nil it
 // must be an untyped nil.
 func (eqb *ExtendedQueryBuilder) appendParam(m *pgtype.Map, oid uint32, format int16, arg any) error {
-	if format == -1 {
-		preferredFormat := eqb.chooseParameterFormatCode(m, oid, arg)
-		preferredErr := eqb.appendParam(m, oid, preferredFormat, arg)
-		if preferredErr == nil {
-			return nil
-		}
-
-		var otherFormat int16
-		if preferredFormat == TextFormatCode {
-			otherFormat = BinaryFormatCode
-		} else {
-			otherFormat = TextFormatCode
-		}
-
-		otherErr := eqb.appendParam(m, oid, otherFormat, arg)
-		if otherErr == nil {
-			return nil
-		}
-
-		return preferredErr // return the error from the preferred format
-	}
-
 	v, err := eqb.encodeExtendedParamValue(m, oid, format, arg)
 	if err != nil {
 		return err
@@ -131,16 +144,4 @@ func (eqb *ExtendedQueryBuilder) encodeExtendedParamValue(m *pgtype.Map, oid uin
 	}
 	eqb.paramValueBytes = buf
 	return eqb.paramValueBytes[pos:], nil
-}
-
-// chooseParameterFormatCode determines the correct format code for an
-// argument to a prepared statement. It defaults to TextFormatCode if no
-// determination can be made.
-func (eqb *ExtendedQueryBuilder) chooseParameterFormatCode(m *pgtype.Map, oid uint32, arg any) int16 {
-	switch arg.(type) {
-	case string, *string:
-		return TextFormatCode
-	}
-
-	return m.FormatCodeForOID(oid)
 }

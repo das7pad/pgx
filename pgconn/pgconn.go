@@ -885,10 +885,12 @@ func convertRowDescription(dst []FieldDescription, rd *pgproto3.RowDescription) 
 }
 
 type StatementDescription struct {
-	Name      string
-	SQL       string
-	ParamOIDs []uint32
-	Fields    []FieldDescription
+	Name                      string
+	SQL                       string
+	ParamOIDs                 []uint32
+	Fields                    []FieldDescription
+	CachedPreferredArgFormats []int16
+	CachedResultFormats       []int16
 }
 
 // Prepare creates a prepared statement. If the name is empty, the anonymous prepared statement will be used. This
